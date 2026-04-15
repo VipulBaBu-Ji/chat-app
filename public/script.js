@@ -1,69 +1,283 @@
 const socket = io();
 
-let username = "";
+const input = document.getElementById("message");
+const messages = document.getElementById("messages");
+const typingDiv = document.getElementById("typing");
+const chatControls = document.getElementById("chatControls");
+const disconnectedUsers = document.getElementById("disconnectedUsers");
+const languageSelect = document.getElementById("languageSelect");
+const translationStatus = document.getElementById("translationStatus");
+const sendButton = document.querySelector(".input button");
+const leaveButton = document.querySelector(".leave-button");
+const welcomePanel = document.getElementById("welcomePanel");
+const topBar = document.querySelector(".topBar");
+const pollPanel = document.getElementById("pollPanel");
+const filePortal = document.getElementById("filePortal");
+const portalStatus = document.getElementById("portalStatus");
 
-while (!username) {
-    username = prompt("Enter your username:");
+let username = "";
+let currentLanguage = "en";
+let activePoll = null;
+
+const translationMap = {
+  es: {
+    "File:": "Archivo:",
+    "is typing...": "está escribiendo...",
+    "Connected": "Conectado",
+    "Global Chat Pro": "Chat Global Pro",
+    "Send": "Enviar",
+    "Leave Chat": "Salir",
+    "Upload File": "Subir archivo",
+    "Current: English": "Actual: Inglés",
+    "Type message...": "Escribe un mensaje...",
+    "Start Chat": "Iniciar chat",
+    "Start Poll": "Iniciar encuesta",
+    "Start File Sharing Portal": "Iniciar portal de archivos",
+    "Share File": "Compartir archivo",
+    "Create Poll": "Crear encuesta"
+  },
+  fr: {
+    "File:": "Fichier:",
+    "is typing...": "est en train d'écrire...",
+    "Connected": "Connecté",
+    "Global Chat Pro": "Chat Global Pro",
+    "Send": "Envoyer",
+    "Leave Chat": "Quitter",
+    "Upload File": "Téléverser",
+    "Current: English": "Courant: Anglais",
+    "Type message...": "Tapez un message...",
+    "Start Chat": "Démarrer le chat",
+    "Start Poll": "Démarrer un sondage",
+    "Start File Sharing Portal": "Démarrer le portail de fichiers",
+    "Share File": "Partager fichier",
+    "Create Poll": "Créer un sondage"
+  },
+  de: {
+    "File:": "Datei:",
+    "is typing...": "schreibt...",
+    "Connected": "Verbunden",
+    "Global Chat Pro": "Globaler Chat Pro",
+    "Send": "Senden",
+    "Leave Chat": "Chat verlassen",
+    "Upload File": "Datei hochladen",
+    "Current: English": "Aktuell: Englisch",
+    "Type message...": "Nachricht eingeben...",
+    "Start Chat": "Chat starten",
+    "Start Poll": "Umfrage starten",
+    "Start File Sharing Portal": "Dateifreigabe-Portal starten",
+    "Share File": "Datei teilen",
+    "Create Poll": "Umfrage erstellen"
+  }
+};
+
+function translateText(text, lang) {
+  if (lang === "en") return text;
+  const map = translationMap[lang] || {};
+  return map[text] || text;
 }
 
-socket.emit("join", username);
+function updateLanguageUI() {
+  currentLanguage = languageSelect.value;
+  translationStatus.textContent = `Current: ${languageSelect.options[languageSelect.selectedIndex].text}`;
+  sendButton.textContent = translateText("Send", currentLanguage);
+  leaveButton.textContent = translateText("Leave Chat", currentLanguage);
+  const messageInput = document.querySelector(".input input");
+  messageInput.placeholder = translateText("Type message...", currentLanguage);
+}
 
-const msgInput = document.getElementById("msg");
-const messages = document.getElementById("messages");
+function ensureUser() {
+  if (!username) {
+    username = prompt("Enter your name");
+    if (!username) return false;
+    socket.emit("join", username);
+  }
+  return true;
+}
 
-function send() {
-    let msg = msgInput.value.trim();
-    if (!msg) return;
+function startChat() {
+  if (!ensureUser()) return;
+  activateChat();
+}
 
-    if (msg.startsWith("/msg")) {
-        let parts = msg.split(" ");
-        let to = parts[1];
-        let text = parts.slice(2).join(" ");
-        socket.emit("privateMessage", { to, msg: text });
-    } else {
-        socket.emit("chatMessage", msg);
-    }
+function activateChat() {
+  welcomePanel.style.display = "none";
+  topBar.style.display = "flex";
+  chatControls.style.display = "flex";
+  pollPanel.style.display = "none";
+  filePortal.style.display = "none";
+  updateLanguageUI();
+}
 
-    addMessage("You: " + msg, "me");
-    msgInput.value = "";
+function startPoll() {
+  if (!ensureUser()) return;
+  welcomePanel.style.display = "none";
+  topBar.style.display = "none";
+  chatControls.style.display = "none";
+  pollPanel.style.display = "block";
+  filePortal.style.display = "none";
+}
+
+function openFilePortal() {
+  if (!ensureUser()) return;
+  welcomePanel.style.display = "none";
+  topBar.style.display = "none";
+  chatControls.style.display = "none";
+  filePortal.style.display = "block";
+  pollPanel.style.display = "none";
+}
+
+function updateFileDetails(file) {
+  if (!file) {
+    document.getElementById("fileName").textContent = "None";
+    document.getElementById("fileType").textContent = "None";
+    document.getElementById("fileSize").textContent = "0 KB";
+    return;
+  }
+
+  document.getElementById("fileName").textContent = file.name;
+  document.getElementById("fileType").textContent = file.type || "Unknown";
+  document.getElementById("fileSize").textContent = `${(file.size / 1024).toFixed(2)} KB`;
+}
+
+function createPoll() {
+  const question = document.getElementById("pollQuestion").value.trim();
+  const options = [
+    document.getElementById("pollOption1").value.trim(),
+    document.getElementById("pollOption2").value.trim()
+  ].filter(Boolean);
+
+  if (!question || options.length < 2) {
+    alert("Please enter a question and at least two options.");
+    return;
+  }
+
+  activePoll = {
+    question,
+    options: options.map((text) => ({ text, votes: 0 }))
+  };
+  renderPoll();
+}
+
+function renderPoll() {
+  const pollResults = document.getElementById("pollResults");
+  pollResults.innerHTML = `
+    <div class="poll-card">
+      <strong>${activePoll.question}</strong>
+      <div class="poll-options"></div>
+    </div>
+  `;
+
+  const optionsContainer = pollResults.querySelector(".poll-options");
+  activePoll.options.forEach((option, index) => {
+    const optionEl = document.createElement("div");
+    optionEl.className = "poll-option";
+    optionEl.innerHTML = `
+      <span>${option.text}</span>
+      <button onclick="votePoll(${index})">Vote</button>
+      <span class="vote-count">${option.votes} votes</span>
+    `;
+    optionsContainer.appendChild(optionEl);
+  });
+}
+
+function votePoll(index) {
+  activePoll.options[index].votes += 1;
+  renderPoll();
+}
+
+function setLanguage() {
+  updateLanguageUI();
+}
+
+function sendMessage() {
+  const msg = input.value.trim();
+  if (!msg) return;
+  socket.emit("sendMessage", msg);
+  input.value = "";
 }
 
 socket.on("message", (data) => {
-    addMessage(`[${data.time}] ${data.user}: ${data.text}`, "other");
+  const li = document.createElement("li");
+  if (typeof data === "string") {
+    li.textContent = translateText(data, currentLanguage);
+  } else {
+    li.innerHTML = `
+      <b>${data.user}:</b> ${translateText(data.text, currentLanguage)}
+      <button onclick="react('${data.id}', '👍')">👍</button>
+    `;
+  }
+  messages.appendChild(li);
 });
 
-socket.on("privateMessage", (data) => {
-    addMessage(`🔒 ${data.from}: ${data.text}`, "private");
+socket.on("userDisconnected", (user) => {
+  const li = document.createElement("li");
+  li.textContent = user;
+  disconnectedUsers.appendChild(li);
 });
 
-socket.on("users", (users) => {
-    let list = document.getElementById("users");
-    list.innerHTML = "";
-
-    users.forEach(u => {
-        let li = document.createElement("li");
-        li.innerText = u;
-        list.appendChild(li);
-    });
-});
-
-msgInput.addEventListener("input", () => {
-    socket.emit("typing");
+input.addEventListener("input", () => {
+  if (!username) return;
+  socket.emit("typing");
+  setTimeout(() => socket.emit("stopTyping"), 1000);
 });
 
 socket.on("typing", (user) => {
-    document.getElementById("typing").innerText = `${user} is typing...`;
-
-    setTimeout(() => {
-        document.getElementById("typing").innerText = "";
-    }, 1000);
+  typingDiv.innerText = translateText(`${user} is typing...`, currentLanguage);
 });
 
-function addMessage(text, type) {
-    let div = document.createElement("div");
-    div.classList.add("msg", type);
-    div.innerText = text;
+socket.on("stopTyping", () => {
+  typingDiv.innerText = "";
+});
 
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+function react(id, emoji) {
+  socket.emit("react", { messageId: id, emoji });
 }
+
+socket.on("reactionUpdate", ({ messageId, emoji }) => {
+  console.log("Reaction:", messageId, emoji);
+});
+
+async function uploadFile() {
+  const fileInput = document.getElementById("fileInput");
+  const file = fileInput.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/upload", { method: "POST", body: formData });
+  const data = await res.json();
+  socket.emit("sendMessage", `File: ${data.fileUrl}`);
+}
+
+async function uploadFilePortal() {
+  const file = document.getElementById("fileInputPortal").files[0];
+  if (!file) {
+    portalStatus.textContent = "Please select a file first.";
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/upload", { method: "POST", body: formData });
+  const data = await res.json();
+  portalStatus.textContent = `Shared: ${data.fileUrl}`;
+  socket.emit("sendMessage", `File: ${data.fileUrl}`);
+}
+
+function leaveChat() {
+  if (username) {
+    const li = document.createElement("li");
+    li.textContent = username;
+    disconnectedUsers.appendChild(li);
+    socket.emit("leave");
+  }
+  topBar.style.display = "none";
+  chatControls.style.display = "none";
+  pollPanel.style.display = "none";
+  filePortal.style.display = "none";
+  welcomePanel.style.display = "block";
+}
+
+window.addEventListener("load", () => {
+  topBar.style.display = "none";
+  pollPanel.style.display = "none";
+  filePortal.style.display = "none";
+});
