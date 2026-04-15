@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Global Chat</title>
+    <title>Global Chat Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -9,24 +9,83 @@
 <div class="app">
 
     <div class="sidebar">
-        <h3>🟢 Online Users</h3>
-        <ul id="users"></ul>
+        <div class="sidebar-section">
+            <h3>🟢 Online Users</h3>
+            <ul id="users"></ul>
+        </div>
+
+        <div class="sidebar-section disconnected">
+            <h3>🔴 Disconnected Users</h3>
+            <ul id="disconnectedUsers"></ul>
+        </div>
     </div>
 
     <div class="chat">
 
         <div class="header">
-            🌍 Global Chat System
+            🌍 Global Chat Pro
+            <span id="status">Connected</span>
         </div>
 
-        <div id="messages" class="messages"></div>
+        <div id="welcomePanel" class="welcomePanel">
+            <h2>Welcome to Global Chat Pro</h2>
+            <p>Choose how you want to start:</p>
+            <div class="welcome-actions">
+                <button onclick="startChat()">Start Chat</button>
+                <button onclick="startPoll()">Start Poll</button>
+                <button onclick="openFilePortal()">Start File Sharing Portal</button>
+            </div>
+        </div>
+
+        <div class="topBar">
+            <div class="input">
+                <input id="message" placeholder="Type message..." />
+                <button onclick="sendMessage()">Send</button>
+            </div>
+
+            <div class="translate-panel">
+                <label for="languageSelect">Translate chat</label>
+                <select id="languageSelect" onchange="setLanguage()">
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                </select>
+                <span id="translationStatus">Current: English</span>
+            </div>
+
+            <div id="chatControls" class="chatControls">
+                <input type="file" id="fileInput" />
+                <button onclick="uploadFile()">Upload File</button>
+                <button onclick="leaveChat()" class="leave-button">Leave Chat</button>
+            </div>
+        </div>
+
+        <div id="pollPanel" class="panel">
+            <h3>Start a Poll</h3>
+            <input id="pollQuestion" placeholder="Poll question" />
+            <input id="pollOption1" placeholder="Option 1" />
+            <input id="pollOption2" placeholder="Option 2" />
+            <button onclick="createPoll()">Create Poll</button>
+            <div id="pollResults" class="poll-results"></div>
+        </div>
+
+        <div id="filePortal" class="panel">
+            <h3>File Sharing Portal</h3>
+            <p>Upload files directly to the chat from this portal.</p>
+            <input type="file" id="fileInputPortal" onchange="updateFileDetails(this.files[0])" />
+            <button onclick="uploadFilePortal()">Share File</button>
+            <div id="fileDetails" class="file-details">
+                <p><strong>File Name:</strong> <span id="fileName">None</span></p>
+                <p><strong>File Type:</strong> <span id="fileType">None</span></p>
+                <p><strong>File Size:</strong> <span id="fileSize">0 KB</span></p>
+            </div>
+            <div id="portalStatus" class="portal-status"></div>
+        </div>
 
         <div id="typing" class="typing"></div>
 
-        <div class="input">
-            <input id="msg" placeholder="Type message or /msg username text" />
-            <button onclick="send()">Send</button>
-        </div>
+        <div id="messages" class="messages"></div>
 
     </div>
 
